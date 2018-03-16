@@ -1,3 +1,5 @@
+// 具有优先级的queue
+
 public class PriorityQueue<Key extends Comparable<Key>> {
     public PriorityQueue(){}
 
