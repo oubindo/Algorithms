@@ -1,19 +1,105 @@
 package wordnet;
 
+import com.sun.org.apache.xpath.internal.operations.Bool;
+import edu.princeton.cs.algs4.Digraph;
+import edu.princeton.cs.algs4.In;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.*;
 
 public class WordNet {
 
+    // 保存数字和单词的对应关系, 因为存在以下情况：1.一个单词是别的单词的同义词，对应多个数字 2.一个单词有多重释义
+    private Map<String, List<Integer>> mWordIndexMap;
+    // 正向保存数字和单词的对应关系
+    private List<String> mWordList;
+
+    private SAP mSap;
+
     // constructor takes the name of the two input files
-    public WordNet(String synsets, String hypernyms){
+    public WordNet(String synsets, String hypernyms) throws IOException {
         if (synsets == null || hypernyms == null){
             throw new IllegalArgumentException("Argument is Null");
         }
+        mWordIndexMap = new HashMap<>();
+        mWordList = new ArrayList<>();
+
+        BufferedReader reader = new BufferedReader(new FileReader(new File(synsets)));
+        String str = null;
+        while((str = reader.readLine()) != null) {
+            String[] strs = str.split(",");
+            String[] nouns = strs[1].split(" ");
+            List<Integer> nums;
+            for (String s:nouns){
+                if (!mWordIndexMap.containsKey(s)){
+                    nums = new LinkedList<>();
+                } else {
+                    nums = mWordIndexMap.get(s);
+                }
+                nums.add(Integer.parseInt(strs[0]));
+                mWordIndexMap.put(s, nums);
+            }
+            mWordList.add(strs[1]);
+        }
+        reader.close();
+        BufferedReader hyperReader = new BufferedReader(new FileReader(new File(hypernyms)));
+        String str2 = null;
+        Digraph digraph = new Digraph(mWordList.size());
+        while((str2 = hyperReader.readLine()) != null) {
+            String[] strs = str2.split(",");
+            int v = Integer.parseInt(strs[0]);
+            for (int i = 0;i < strs.length; i++){
+                digraph.addEdge(v, Integer.parseInt(strs[i]));
+            }
+        }
+        hyperReader.close();
+        if (!isDAG(digraph)){
+            throw new IllegalArgumentException();
+        }
+        mSap = new SAP(digraph);
+    }
+
+    public boolean isDAG(Digraph digraph) {
+        Map<Integer, Boolean> visited = new HashMap<>();
+        Stack<Integer> stack = new Stack<>();
+        int root = 0;
+        for (int i = 0; i < digraph.V(); i++){
+            if (!dfs(digraph, i, visited, stack)) return false;
+
+            // 接下来寻找多root，主要是看有没有大于一个点没有outdegree
+            int n = 0;
+            Iterator<Integer> it = digraph.adj(i).iterator();
+            while (it.hasNext()){
+                n += 1;
+                it.next();
+            }
+            if (n == 0) root += 1;
+        }
+        if (root > 1) return false;
+
+        return true;
+    }
+
+    public boolean dfs(Digraph digraph, int v, Map<Integer, Boolean> visited, Stack<Integer> stack){
+        if (digraph == null) return false;
+        stack.push(v);
+        visited.put(v, true);
+        for (int w: digraph.adj(v)){
+            if (stack.contains(w)) return false;
+            if (!visited.containsKey(w)){
+                if (!dfs(digraph, w, visited, stack)) return false;
+            }
+        }
+        stack.pop();
+        return true;
     }
 
     // returns all WordNet nouns
-    public Iterable<String> nouns(){
-        return null;
+    public Iterable<String> nouns() throws IllegalAccessException {
+        return mWordIndexMap.keySet();
     }
 
     // is the word a WordNet noun?
@@ -22,29 +108,34 @@ public class WordNet {
         if (word == null){
             throw new IllegalArgumentException("Argument is Null");
         }
+        return mWordIndexMap.containsKey(word);
     }
 
     // distance between nounA and nounB (defined below)
-    // TODO: 2018/3/16 如果nounA和nounB不是WordNet的nouns的话就抛出IllegalArgumentException异常
     public int distance(String nounA, String nounB){
         if (nounA == null || nounB == null){
             throw new IllegalArgumentException("Argument is Null");
         }
+        return mSap.length(mWordIndexMap.get(nounA), mWordIndexMap.get(nounB));
     }
 
     // a synset (second field of synsets.txt) that is the common ancestor of nounA and nounB
     // in a shortest ancestral path (defined below)
-    // TODO: 2018/3/16 如果nounA和nounB不是WordNet的nouns的话就抛出IllegalArgumentException异常
     public String sap(String nounA, String nounB){
-        if (nounA == null || nounB == null){
+        if (!isNoun(nounA) || !isNoun(nounB)){
             throw new IllegalArgumentException("Argument is Null");
         }
+        int id = mSap.ancestor(mWordIndexMap.get(nounA), mWordIndexMap.get(nounB));
+        return mWordList.get(id);
     }
-
 
     // do unit testing of this class
     public static void main(String[] args){
-
+        try {
+            WordNet wordNet = new WordNet(args[0], args[1]);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
     }
 
