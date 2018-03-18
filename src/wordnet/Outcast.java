@@ -3,7 +3,6 @@ package wordnet;
 import edu.princeton.cs.algs4.In;
 import edu.princeton.cs.algs4.StdOut;
 
-import java.io.IOException;
 
 public class Outcast {
     private WordNet mWordnet;
@@ -15,23 +14,29 @@ public class Outcast {
 
     // given an array of WordNet nouns, return an outcast
     public String outcast(String[] nouns){
-        String bestNoun = "";
-        int bestDist = 0;
+        int[] distance = new int[nouns.length];
         for (int i = 0; i < nouns.length; i++) {
-            int currentDist = 0;
-            for (int j = 0; j < nouns.length; j++) {
-                currentDist += mWordnet.distance(nouns[i], nouns[j]);
-            }
-            if (bestDist < currentDist) {
-                bestDist = currentDist;
-                bestNoun = nouns[i];
+            for (int j = i; j < nouns.length; j++) {
+                int dist = mWordnet.distance(nouns[i], nouns[j]);
+                distance[i] += dist;
+                if (i != j) {
+                    distance[j] += dist;
+                }
             }
         }
-        return bestNoun;
+        int maxDistance = 0;
+        int maxIndex = 0;
+        for (int i=0; i<distance.length; i++){
+            if (distance[i] > maxDistance){
+                maxDistance = distance[i];
+                maxIndex = i;
+            }
+        }
+        return nouns[maxIndex];
     }
 
     // see test client below
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args){
         WordNet wordnet = new WordNet(args[0], args[1]);
         Outcast outcast = new Outcast(wordnet);
         for (int t = 2; t < args.length; t++) {

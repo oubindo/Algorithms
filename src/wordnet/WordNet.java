@@ -1,33 +1,36 @@
 package wordnet;
 
-import com.sun.org.apache.xpath.internal.operations.Bool;
 import edu.princeton.cs.algs4.Digraph;
+import edu.princeton.cs.algs4.DirectedCycle;
 import edu.princeton.cs.algs4.In;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.LinkedList;
+import java.util.Iterator;
+import java.util.Stack;
 
 public class WordNet {
 
     // 保存数字和单词的对应关系, 因为存在以下情况：1.一个单词是别的单词的同义词，对应多个数字 2.一个单词有多重释义
-    private Map<String, List<Integer>> mWordIndexMap;
+    private Map<String, List<Integer>> mWordIndexMap;  // HashMap的增加，查找，删除都是O(logN)级别的
     // 正向保存数字和单词的对应关系
     private List<String> mWordList;
 
     private SAP mSap;
 
     // constructor takes the name of the two input files
-    public WordNet(String synsets, String hypernyms) throws IOException {
+    public WordNet(String synsets, String hypernyms) {
         if (synsets == null || hypernyms == null){
             throw new IllegalArgumentException("Argument is Null");
         }
         mWordIndexMap = new HashMap<>();
         mWordList = new ArrayList<>();
 
-        BufferedReader reader = new BufferedReader(new FileReader(new File(synsets)));
+        //BufferedReader reader = new BufferedReader(new FileReader(new File(synsets)));
+        In reader = new In(synsets);
         String str = null;
         while((str = reader.readLine()) != null) {
             String[] strs = str.split(",");
@@ -45,60 +48,41 @@ public class WordNet {
             mWordList.add(strs[1]);
         }
         reader.close();
-        BufferedReader hyperReader = new BufferedReader(new FileReader(new File(hypernyms)));
+        In hyperReader = new In(hypernyms);
         String str2 = null;
         Digraph digraph = new Digraph(mWordList.size());
+        boolean[] notRoot = new boolean[mWordList.size()];
         while((str2 = hyperReader.readLine()) != null) {
             String[] strs = str2.split(",");
             int v = Integer.parseInt(strs[0]);
+            notRoot[v] = true;
             for (int i = 0;i < strs.length; i++){
                 digraph.addEdge(v, Integer.parseInt(strs[i]));
             }
         }
         hyperReader.close();
-        if (!isDAG(digraph)){
+        if (!isDAG(digraph, notRoot)){
             throw new IllegalArgumentException();
         }
         mSap = new SAP(digraph);
     }
 
-    public boolean isDAG(Digraph digraph) {
-        Map<Integer, Boolean> visited = new HashMap<>();
-        Stack<Integer> stack = new Stack<>();
-        int root = 0;
-        for (int i = 0; i < digraph.V(); i++){
-            if (!dfs(digraph, i, visited, stack)) return false;
-
-            // 接下来寻找多root，主要是看有没有大于一个点没有outdegree
-            int n = 0;
-            Iterator<Integer> it = digraph.adj(i).iterator();
-            while (it.hasNext()){
-                n += 1;
-                it.next();
-            }
-            if (n == 0) root += 1;
+    private boolean isDAG(Digraph digraph, boolean[] notRoot) {
+        DirectedCycle directedCycle = new DirectedCycle(digraph);
+        if (directedCycle.hasCycle()) {
+            System.out.println(directedCycle.cycle());
+            return false;
         }
-        if (root > 1) return false;
 
-        return true;
-    }
-
-    public boolean dfs(Digraph digraph, int v, Map<Integer, Boolean> visited, Stack<Integer> stack){
-        if (digraph == null) return false;
-        stack.push(v);
-        visited.put(v, true);
-        for (int w: digraph.adj(v)){
-            if (stack.contains(w)) return false;
-            if (!visited.containsKey(w)){
-                if (!dfs(digraph, w, visited, stack)) return false;
-            }
+        // 查找是否有多个root
+        int count = 0;
+        for (boolean v: notRoot){
+            if (!v) count++;
         }
-        stack.pop();
-        return true;
+        return count == 1;
     }
-
     // returns all WordNet nouns
-    public Iterable<String> nouns() throws IllegalAccessException {
+    public Iterable<String> nouns(){
         return mWordIndexMap.keySet();
     }
 
@@ -128,16 +112,4 @@ public class WordNet {
         int id = mSap.ancestor(mWordIndexMap.get(nounA), mWordIndexMap.get(nounB));
         return mWordList.get(id);
     }
-
-    // do unit testing of this class
-    public static void main(String[] args){
-        try {
-            WordNet wordNet = new WordNet(args[0], args[1]);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-    }
-
-
 }
